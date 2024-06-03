@@ -41,6 +41,7 @@ async function run() {
         await client.connect();
 
         const userCollection = client.db('motionMaxDB').collection('users')
+        const sliderCollection = client.db('motionMaxDB').collection('slider')
 
         //user related api
         app.get('/users', async (req, res) => {
@@ -54,10 +55,16 @@ async function run() {
             res.send(result)
         })
 
+        //slider api
+        app.get('/slider', async (req, res) => {
+            const result = await sliderCollection.find().toArray()
+            res.send(result)
+        })
+
         //auth related api
-        //creating Token
+        // creating Token
         app.post("/jwt", async (req, res) => {
-            const user = req.body;
+            const user = req.body.email;
             console.log("user for token", user);
             const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET);
 
@@ -66,12 +73,28 @@ async function run() {
 
         //clearing Token
         app.post("/logout", async (req, res) => {
-            const user = req.body;
+            const user = req.body.email;
             console.log("logging out", user);
             res
                 .clearCookie("token", { ...cookieOptions, maxAge: 0 })
-                .send({ success: true });
+                .send({ success: true })
         });
+
+        // app.post('/jwt', async (req, res) => {
+        //     const user = req.body
+        //     console.log('user for token', user);
+
+        //     const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, { expiresIn: '1h' })
+        //     res
+        //         .cookie('token', token, cookieOptions)
+        //         .send({ success: true })
+        // })
+
+        // app.post('/logout', async (req, res) => {
+        //     const user = req.body;
+        //     console.log('logging out', user);
+        //     res.clearCookie('token', { ...cookieOptions, maxAge: 0 }).send({ success: true })
+        // })
 
         // Send a ping to confirm a successful connection
         await client.db("admin").command({ ping: 1 });
