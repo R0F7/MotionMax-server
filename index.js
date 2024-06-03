@@ -42,6 +42,7 @@ async function run() {
 
         const userCollection = client.db('motionMaxDB').collection('users')
         const sliderCollection = client.db('motionMaxDB').collection('slider')
+        const servicesCollection = client.db('motionMaxDB').collection('services')
 
         //user related api
         app.get('/users', async (req, res) => {
@@ -58,6 +59,12 @@ async function run() {
         //slider api
         app.get('/slider', async (req, res) => {
             const result = await sliderCollection.find().toArray()
+            res.send(result)
+        })
+
+        //services api
+        app.get('/services', async (req, res) => {
+            const result = await servicesCollection.find().toArray()
             res.send(result)
         })
 
