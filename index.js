@@ -24,6 +24,26 @@ app.use(cors(corsOptions))
 app.use(express.json())
 app.use(cookieParser())
 
+
+// Verify Token Middleware
+const verifyToken = async (req, res, next) => {
+    const token = req.cookies?.token
+    // console.log(token)
+    
+    if (!token) {
+      return res.status(401).send({ message: 'unauthorized access' })
+    }
+    jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err, decoded) => {
+      if (err) {
+        console.log(err)
+        return res.status(401).send({ message: 'unauthorized access' })
+      }
+      req.user = decoded
+    //   console.log('in verify',req.user);
+      next()
+    })
+  }
+
 const uri = `mongodb+srv://${process.env.USER_NAME}:${process.env.USER_PASS}@cluster0.wezoknx.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
 
 // Create a MongoClient with a MongoClientOptions object to set the Stable API version
@@ -40,7 +60,7 @@ async function run() {
         // Connect the client to the server	(optional starting in v4.7)
         await client.connect();
 
-        const userCollection = client.db('motionMaxDB').collection('users')
+        const usersCollection = client.db('motionMaxDB').collection('users')
         const sliderCollection = client.db('motionMaxDB').collection('slider')
         const servicesCollection = client.db('motionMaxDB').collection('services')
         const testimonialsCollection = client.db('motionMaxDB').collection('testimonials')
@@ -50,13 +70,60 @@ async function run() {
 
         //user related api
         app.get('/users', async (req, res) => {
-            const result = await userCollection.find().toArray()
+            const result = await usersCollection.find().toArray()
             res.send(result)
         })
 
+        // app.post('/users', async (req, res) => {
+        //     const doc = req.body
+        //     const result = await usersCollection.insertOne(doc)
+        //     res.send(result)
+        // })
+
+        app.get('/users/HR/:email', verifyToken, async (req, res) => {
+            const email = req.params.email;
+            console.log(email);
+
+            if (email !== req.user.email) {
+                return res.status(403).send({ message: 'forbidden access' })
+            }
+
+            const query = { email: email }
+            const user = await usersCollection.findOne(query)
+            let HR = false
+            if (user) {
+                HR = user?.role === 'HR'
+            }
+            res.send({ HR })
+        })
+
+        app.get('/users/admin/:email', verifyToken, async (req, res) => {
+            const email = req.params.email;
+            // console.log('lklklk',req.user.email);
+
+            if (email !== req.user.email) {
+                return res.status(403).send({ message: 'forbidden access' })
+            }
+
+            const query = { email: email }
+            const user = await usersCollection.findOne(query)
+            let admin = false
+            if (user) {
+                admin = user?.role === 'admin'
+            }
+            res.send({ admin })
+        })
+
         app.post('/users', async (req, res) => {
-            const doc = req.body
-            const result = await userCollection.insertOne(doc)
+            const user = req.body
+            const query = { email: user.email }
+            const existingUser = await usersCollection.findOne(query)
+
+            if (existingUser) {
+                return res.send({ message: 'user already exists', insertedId: null })
+            }
+
+            const result = await usersCollection.insertOne(user)
             res.send(result)
         })
 
@@ -91,8 +158,9 @@ async function run() {
         })
 
         //For Employee
-        app.get('/work-sheet', async (req, res) => {
-            const result = await workSheetCollection.find().sort({createAt : -1}).toArray()
+        app.get('/work-sheet',verifyToken, async (req, res) => {
+            const { email } = req.query
+            const result = await workSheetCollection.find({ user_email: email }).sort({ createAt: -1 }).toArray()
             res.send(result)
         })
 
@@ -106,7 +174,7 @@ async function run() {
         // creating Token
         app.post("/jwt", async (req, res) => {
             const user = req.body.email;
-            console.log("user for token", user);
+            // console.log("user for token", user);
             const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET);
 
             res.cookie("token", token, cookieOptions).send({ success: true });
