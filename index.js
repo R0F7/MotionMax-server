@@ -2,7 +2,7 @@ const express = require('express');
 const app = express();
 const cors = require('cors');
 require('dotenv').config();
-const { MongoClient, ServerApiVersion } = require('mongodb');
+const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const jwt = require('jsonwebtoken')
 const cookieParser = require('cookie-parser');
 const port = process.env.PORT || 5000;
@@ -29,20 +29,31 @@ app.use(cookieParser())
 const verifyToken = async (req, res, next) => {
     const token = req.cookies?.token
     // console.log(token)
-    
+
     if (!token) {
-      return res.status(401).send({ message: 'unauthorized access' })
+        return res.status(401).send({ message: 'unauthorized access' })
     }
     jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err, decoded) => {
-      if (err) {
-        console.log(err)
-        return res.status(401).send({ message: 'unauthorized access' })
-      }
-      req.user = decoded
-    //   console.log('in verify',req.user);
-      next()
+        if (err) {
+            console.log(err)
+            return res.status(401).send({ message: 'unauthorized access' })
+        }
+        req.user = decoded
+        //   console.log('in verify',req.user);
+        next()
     })
-  }
+}
+
+const verifyHR = async (req, res, next) => {
+    const email = req.decoded.email
+    const query = { email: email }
+    const user = await usersCollection.findOne(query)
+    const isHR = user?.role === 'HR'
+    if (!isHR) {
+        return res.status(403).send({ message: 'forbidden access' })
+    }
+    next()
+}
 
 const uri = `mongodb+srv://${process.env.USER_NAME}:${process.env.USER_PASS}@cluster0.wezoknx.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
 
@@ -82,7 +93,7 @@ async function run() {
 
         app.get('/users/HR/:email', verifyToken, async (req, res) => {
             const email = req.params.email;
-            console.log(email);
+            // console.log(email);
 
             if (email !== req.user.email) {
                 return res.status(403).send({ message: 'forbidden access' })
@@ -127,6 +138,26 @@ async function run() {
             res.send(result)
         })
 
+        app.patch('/verify/:id', async (req, res) => {
+            const id = req.params.id
+            const item = req.body
+            const filter = { _id: new ObjectId(id) }
+            const updatedDoc = {
+                $set: {
+                    name: item.name,
+                    role: item.role,
+                    email: item.email,
+                    salary: item.salary,
+                    image_url: item.image_url,
+                    designation: item.designation,
+                    bank_account_no: item.bank_account_no,
+                    isVerified: true,
+                }
+            }
+            const result = await usersCollection.updateOne(filter, updatedDoc)
+            res.send(result)
+        })
+
         //slider api
         app.get('/slider', async (req, res) => {
             const result = await sliderCollection.find().toArray()
@@ -158,7 +189,7 @@ async function run() {
         })
 
         //For Employee
-        app.get('/work-sheet',verifyToken, async (req, res) => {
+        app.get('/work-sheet', verifyToken, async (req, res) => {
             const { email } = req.query
             const result = await workSheetCollection.find({ user_email: email }).sort({ createAt: -1 }).toArray()
             res.send(result)
