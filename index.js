@@ -46,6 +46,7 @@ async function run() {
         const testimonialsCollection = client.db('motionMaxDB').collection('testimonials')
         const featuredVehiclesCollection = client.db('motionMaxDB').collection('featuredVehicles')
         const partnersCollection = client.db('motionMaxDB').collection('partners')
+        const workSheetCollection = client.db('motionMaxDB').collection('workSheet')
 
         //user related api
         app.get('/users', async (req, res) => {
@@ -86,6 +87,18 @@ async function run() {
         //testimonials api
         app.get('/testimonials', async (req, res) => {
             const result = await testimonialsCollection.find().toArray()
+            res.send(result)
+        })
+
+        //For Employee
+        app.get('/work-sheet', async (req, res) => {
+            const result = await workSheetCollection.find().sort({createAt : -1}).toArray()
+            res.send(result)
+        })
+
+        app.post('/work-sheet', async (req, res) => {
+            const doc = req.body
+            const result = await workSheetCollection.insertOne(doc)
             res.send(result)
         })
 
