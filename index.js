@@ -121,6 +121,14 @@ async function run() {
             res.send({ admin })
         })
 
+        app.get('/all-info/:email', async (req, res) => {
+            const email = req.params.email
+            const query = {email: email}
+            const user = await usersCollection.findOne(query)
+            const payments = await paymentsCollection.find(query).toArray()
+            res.send({user,payments})
+        })
+
         app.post('/users', async (req, res) => {
             const user = req.body
             const query = { email: user.email }
@@ -172,7 +180,7 @@ async function run() {
 
         })
 
-        app.get('/payment-history/:email',verifyToken, async (req, res) => {
+        app.get('/payment-history/:email', verifyToken, async (req, res) => {
             const email = req.params.email;
             console.log(email);
 
