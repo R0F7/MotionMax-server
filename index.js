@@ -5,6 +5,7 @@ require('dotenv').config();
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const jwt = require('jsonwebtoken')
 const cookieParser = require('cookie-parser');
+const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY)
 const port = process.env.PORT || 5000;
 
 const corsOptions = {
@@ -23,37 +24,6 @@ const cookieOptions = {
 app.use(cors(corsOptions))
 app.use(express.json())
 app.use(cookieParser())
-
-
-// Verify Token Middleware
-const verifyToken = async (req, res, next) => {
-    const token = req.cookies?.token
-    // console.log(token)
-
-    if (!token) {
-        return res.status(401).send({ message: 'unauthorized access' })
-    }
-    jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err, decoded) => {
-        if (err) {
-            console.log(err)
-            return res.status(401).send({ message: 'unauthorized access' })
-        }
-        req.user = decoded
-        //   console.log('in verify',req.user);
-        next()
-    })
-}
-
-const verifyHR = async (req, res, next) => {
-    const email = req.decoded.email
-    const query = { email: email }
-    const user = await usersCollection.findOne(query)
-    const isHR = user?.role === 'HR'
-    if (!isHR) {
-        return res.status(403).send({ message: 'forbidden access' })
-    }
-    next()
-}
 
 const uri = `mongodb+srv://${process.env.USER_NAME}:${process.env.USER_PASS}@cluster0.wezoknx.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
 
@@ -78,18 +48,44 @@ async function run() {
         const featuredVehiclesCollection = client.db('motionMaxDB').collection('featuredVehicles')
         const partnersCollection = client.db('motionMaxDB').collection('partners')
         const workSheetCollection = client.db('motionMaxDB').collection('workSheet')
+        const paymentsCollection = client.db('motionMaxDB').collection('payments')
+
+        // Verify Token Middleware
+        const verifyToken = async (req, res, next) => {
+            const token = req.cookies?.token
+            // console.log(token)
+
+            if (!token) {
+                return res.status(401).send({ message: 'unauthorized access' })
+            }
+            jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err, decoded) => {
+                if (err) {
+                    console.log(err)
+                    return res.status(401).send({ message: 'unauthorized access' })
+                }
+                req.user = decoded
+                //   console.log('in verify',req.user);
+                next()
+            })
+        }
+
+        const verifyHR = async (req, res, next) => {
+            const email = req.user.email
+            const query = { email: email }
+            const user = await usersCollection.findOne(query)
+            const isHR = user?.role === 'HR'
+            if (!isHR) {
+                return res.status(403).send({ message: 'forbidden access' })
+            }
+            next()
+        }
 
         //user related api
         app.get('/users', async (req, res) => {
-            const result = await usersCollection.find().toArray()
+            const filter = { role: 'Employee' }
+            const result = await usersCollection.find(filter).toArray()
             res.send(result)
         })
-
-        // app.post('/users', async (req, res) => {
-        //     const doc = req.body
-        //     const result = await usersCollection.insertOne(doc)
-        //     res.send(result)
-        // })
 
         app.get('/users/HR/:email', verifyToken, async (req, res) => {
             const email = req.params.email;
@@ -155,6 +151,44 @@ async function run() {
                 }
             }
             const result = await usersCollection.updateOne(filter, updatedDoc)
+            res.send(result)
+        })
+
+        //payment 
+        app.post('/create-payment-intent', async (req, res) => {
+            const { salary } = req.body;
+            const amount = parseInt(salary * 100);
+            // console.log(amount, 'amount inside the intent');
+
+            const paymentIntent = await stripe.paymentIntents.create({
+                amount: amount,
+                currency: 'usd',
+                payment_method_types: ['card']
+            })
+
+            res.send({
+                clientSecret: paymentIntent.client_secret
+            })
+
+        })
+
+        app.get('/payments', verifyToken, verifyHR, async (req, res) => {
+            const result = await paymentsCollection.find().toArray()
+            res.send(result)
+        })
+
+        app.post('/payments', async (req, res) => {
+            const paymentInfo = req.body
+            // const email = req.body.email
+            // const month = req.body.month
+            // console.log(email, month);
+            // const query = { email: email, month: month }
+            // const existingPayment = await paymentsCollection.findOne(query)
+            // console.log(existingPayment);
+            // if (existingPayment) {
+            //     return res.send()
+            // }
+            const result = await paymentsCollection.insertOne(paymentInfo)
             res.send(result)
         })
 
