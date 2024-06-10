@@ -172,6 +172,19 @@ async function run() {
 
         })
 
+        app.get('/payment-history/:email',verifyToken, async (req, res) => {
+            const email = req.params.email;
+            console.log(email);
+
+            if (email !== req.user.email) {
+                return res.status(403).send({ message: 'forbidden access' })
+            }
+
+            const query = { email: email }
+            const result = await paymentsCollection.find(query).sort({ month: -1 }).toArray()
+            res.send(result)
+        })
+
         app.get('/payments', verifyToken, verifyHR, async (req, res) => {
             const result = await paymentsCollection.find().toArray()
             res.send(result)
@@ -179,15 +192,6 @@ async function run() {
 
         app.post('/payments', async (req, res) => {
             const paymentInfo = req.body
-            // const email = req.body.email
-            // const month = req.body.month
-            // console.log(email, month);
-            // const query = { email: email, month: month }
-            // const existingPayment = await paymentsCollection.findOne(query)
-            // console.log(existingPayment);
-            // if (existingPayment) {
-            //     return res.send()
-            // }
             const result = await paymentsCollection.insertOne(paymentInfo)
             res.send(result)
         })
