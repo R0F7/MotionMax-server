@@ -121,12 +121,31 @@ async function run() {
             res.send({ admin })
         })
 
+        //For Employee
+        app.get('/work-sheet', verifyToken, async (req, res) => {
+            const { email } = req.query
+            const result = await workSheetCollection.find({ user_email: email }).sort({ createAt: -1 }).toArray()
+            res.send(result)
+        })
+
+        app.get('/progress-work', verifyToken, async (req, res) => {
+            // const { email } = req.query
+            const result = await workSheetCollection.find().sort({ createAt: -1 }).toArray()
+            res.send(result)
+        })
+
+        app.post('/work-sheet', async (req, res) => {
+            const doc = req.body
+            const result = await workSheetCollection.insertOne(doc)
+            res.send(result)
+        })
+
         app.get('/all-info/:email', async (req, res) => {
             const email = req.params.email
-            const query = {email: email}
+            const query = { email: email }
             const user = await usersCollection.findOne(query)
-            const payments = await paymentsCollection.find(query).toArray()
-            res.send({user,payments})
+            const payments = await paymentsCollection.find(query).sort({ month: 1 }).toArray()
+            res.send({ user, payments })
         })
 
         app.post('/users', async (req, res) => {
@@ -161,6 +180,34 @@ async function run() {
             const result = await usersCollection.updateOne(filter, updatedDoc)
             res.send(result)
         })
+
+        app.get('/work-sheets', async (req, res) => {
+            const { employeeName, month } = req.query;
+            console.log(employeeName, month);
+        
+            let query = {};
+        
+            if (employeeName) {
+                const user = await usersCollection.findOne({ name: employeeName });
+                if (user) {
+                    query.user_email = user.email;
+                }
+            }
+            
+            if (month) {
+                query.date = { $regex: `^${parseInt(month)}/` };
+            }
+            
+            console.log(query);
+            
+            try {
+                const result = await workSheetCollection.find(query).toArray();
+                res.send(result);
+            } catch (error) {
+                res.status(500).send({ error: 'An error occurred while fetching the work records' });
+            }
+        });
+        
 
         //payment 
         app.post('/create-payment-intent', async (req, res) => {
@@ -231,19 +278,6 @@ async function run() {
         //testimonials api
         app.get('/testimonials', async (req, res) => {
             const result = await testimonialsCollection.find().toArray()
-            res.send(result)
-        })
-
-        //For Employee
-        app.get('/work-sheet', verifyToken, async (req, res) => {
-            const { email } = req.query
-            const result = await workSheetCollection.find({ user_email: email }).sort({ createAt: -1 }).toArray()
-            res.send(result)
-        })
-
-        app.post('/work-sheet', async (req, res) => {
-            const doc = req.body
-            const result = await workSheetCollection.insertOne(doc)
             res.send(result)
         })
 
