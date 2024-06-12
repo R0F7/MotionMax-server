@@ -80,6 +80,17 @@ async function run() {
             next()
         }
 
+        const verifyAdmin = async (req, res, next) => {
+            const email = req.user.email
+            const query = { email: email }
+            const user = await usersCollection.findOne(query)
+            const isAdmin = user?.role === 'Admin'
+            if (!isAdmin) {
+                return res.status(403).send({ message: 'forbidden access' })
+            }
+            next()
+        }
+
         //user related api
 
         app.get('/users/HR/:email', verifyToken, async (req, res) => {
@@ -122,7 +133,21 @@ async function run() {
             res.send(result)
         })
 
-        app.patch('/all-employee/:id', async (req, res) => {
+        app.patch('/increasing-salary/:email', async (req, res) => {
+            const email = req.params.email
+            const salary = req.body.value
+            console.log(salary);
+            const filter = { email: email }
+            const updatedDoc = {
+                $set:{
+                    salary: salary
+                }
+            }
+            const result = await usersCollection.updateOne(filter,updatedDoc)
+            res.send(result)
+        })
+
+        app.patch('/all-employee/:id', verifyToken, verifyAdmin, async (req, res) => {
             const id = req.params.id
             const filter = { _id: new ObjectId(id) }
             const updatedDoc = {
@@ -134,7 +159,7 @@ async function run() {
             res.send(result)
         })
 
-        app.patch('/all-employee-fired/:id', async (req, res) => {
+        app.patch('/all-employee-fired/:id', verifyToken, verifyAdmin, async (req, res) => {
             const id = req.params.id
             const filter = { _id: new ObjectId(id) }
             const options = { upsert: true }
