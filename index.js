@@ -49,6 +49,7 @@ async function run() {
         const partnersCollection = client.db('motionMaxDB').collection('partners')
         const workSheetCollection = client.db('motionMaxDB').collection('workSheet')
         const paymentsCollection = client.db('motionMaxDB').collection('payments')
+        const messagesCollection = client.db('motionMaxDB').collection('messages')
 
         // Verify Token Middleware
         const verifyToken = async (req, res, next) => {
@@ -92,6 +93,23 @@ async function run() {
         }
 
         //user related api
+
+        app.get('/users/employee/:email', verifyToken, async (req, res) => {
+            const email = req.params.email;
+            // console.log(email);
+
+            if (email !== req.user.email) {
+                return res.status(403).send({ message: 'forbidden access' })
+            }
+
+            const query = { email: email }
+            const user = await usersCollection.findOne(query)
+            let employee = false
+            if (user) {
+                employee = user?.role === 'Employee'
+            }
+            res.send({ employee })
+        })
 
         app.get('/users/HR/:email', verifyToken, async (req, res) => {
             const email = req.params.email;
@@ -139,11 +157,11 @@ async function run() {
             console.log(salary);
             const filter = { email: email }
             const updatedDoc = {
-                $set:{
+                $set: {
                     salary: salary
                 }
             }
-            const result = await usersCollection.updateOne(filter,updatedDoc)
+            const result = await usersCollection.updateOne(filter, updatedDoc)
             res.send(result)
         })
 
@@ -255,6 +273,17 @@ async function run() {
             const result = await workSheetCollection.find(query).toArray();
             res.send(result);
         });
+
+        app.get('/message', async (req, res) => {
+            const result = await messagesCollection.find().toArray()
+            res.send(result)
+        })
+
+        app.post('/message', async (req, res) => {
+            const info = req.body
+            const result = await messagesCollection.insertOne(info)
+            res.send(result)
+        })
 
 
         //payment 
