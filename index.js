@@ -9,7 +9,10 @@ const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY)
 const port = process.env.PORT || 5000;
 
 const corsOptions = {
-    origin: ['http://localhost:5173', 'http://localhost:5174'],
+    origin: [
+        'http://localhost:5173',
+        'http://localhost:5174',
+    ],
     credentials: true,
     optionSuccessStatus: 200,
 }
@@ -68,6 +71,17 @@ async function run() {
                 //   console.log('in verify',req.user);
                 next()
             })
+        }
+
+        const verifyEmployee = async (req, res, next) => {
+            const email = req.user.email
+            const query = { email: email }
+            const user = await usersCollection.findOne(query)
+            const isEmployee = user?.role === 'Employee'
+            if (!isEmployee) {
+                return res.status(403).send({ message: 'forbidden access' })
+            }
+            next()
         }
 
         const verifyHR = async (req, res, next) => {
@@ -145,13 +159,13 @@ async function run() {
             res.send({ admin })
         })
 
-        app.get('/all-employee', async (req, res) => {
+        app.get('/all-employee', verifyToken, verifyAdmin, async (req, res) => {
             const filter = { role: { $ne: 'Admin' }, isVerified: true };
             const result = await usersCollection.find(filter).toArray()
             res.send(result)
         })
 
-        app.patch('/increasing-salary/:email', async (req, res) => {
+        app.patch('/increasing-salary/:email', verifyToken, verifyAdmin, async (req, res) => {
             const email = req.params.email
             const salary = req.body.value
             console.log(salary);
@@ -201,8 +215,21 @@ async function run() {
             res.send(result)
         })
 
+        app.post('/users', async (req, res) => {
+            const user = req.body
+            const query = { email: user.email }
+            const existingUser = await usersCollection.findOne(query)
+
+            if (existingUser) {
+                return res.send({ message: 'user already exists', insertedId: null })
+            }
+
+            const result = await usersCollection.insertOne(user)
+            res.send(result)
+        })
+
         //For Employee
-        app.get('/work-sheet', verifyToken, async (req, res) => {
+        app.get('/work-sheet', verifyToken, verifyEmployee, async (req, res) => {
             const { email } = req.query
             const result = await workSheetCollection.find({ user_email: email }).sort({ createAt: -1 }).toArray()
             res.send(result)
@@ -228,20 +255,7 @@ async function run() {
             res.send({ user, payments })
         })
 
-        app.post('/users', async (req, res) => {
-            const user = req.body
-            const query = { email: user.email }
-            const existingUser = await usersCollection.findOne(query)
-
-            if (existingUser) {
-                return res.send({ message: 'user already exists', insertedId: null })
-            }
-
-            const result = await usersCollection.insertOne(user)
-            res.send(result)
-        })
-
-        app.patch('/verify/:id', async (req, res) => {
+        app.patch('/verify/:id', verifyToken, verifyHR, async (req, res) => {
             const id = req.params.id
             const filter = { _id: new ObjectId(id) }
             const updatedDoc = {
@@ -304,7 +318,7 @@ async function run() {
 
         })
 
-        app.get('/payment-history/:email', verifyToken, async (req, res) => {
+        app.get('/payment-history/:email', verifyToken, verifyEmployee, async (req, res) => {
             const email = req.params.email;
             console.log(email);
 
@@ -410,5 +424,5 @@ app.get('/', (req, res) => {
 })
 
 app.listen(port, () => {
-    console.log(`MotionMax chal raha hai ppni joss main on port:${port}`);
+    console.log(`MotionMax chal raha hai apni joss main on port:${port}`);
 })
