@@ -81,11 +81,6 @@ async function run() {
         }
 
         //user related api
-        app.get('/users', async (req, res) => {
-            const filter = { role: 'Employee' }
-            const result = await usersCollection.find(filter).toArray()
-            res.send(result)
-        })
 
         app.get('/users/HR/:email', verifyToken, async (req, res) => {
             const email = req.params.email;
@@ -116,9 +111,51 @@ async function run() {
             const user = await usersCollection.findOne(query)
             let admin = false
             if (user) {
-                admin = user?.role === 'admin'
+                admin = user?.role === 'Admin'
             }
             res.send({ admin })
+        })
+
+        app.get('/all-employee', async (req, res) => {
+            const filter = { role: { $ne: 'Admin' }, isVerified: true };
+            const result = await usersCollection.find(filter).toArray()
+            res.send(result)
+        })
+
+        app.patch('/all-employee/:id', async (req, res) => {
+            const id = req.params.id
+            const filter = { _id: new ObjectId(id) }
+            const updatedDoc = {
+                $set: {
+                    role: 'HR'
+                }
+            }
+            const result = await usersCollection.updateOne(filter, updatedDoc)
+            res.send(result)
+        })
+
+        app.patch('/all-employee-fired/:id', async (req, res) => {
+            const id = req.params.id
+            const filter = { _id: new ObjectId(id) }
+            const options = { upsert: true }
+            const updatedDoc = {
+                $set: {
+                    isFired: true
+                }
+            }
+            const result = await usersCollection.updateOne(filter, updatedDoc, options)
+            res.send(result)
+        })
+
+        app.get('/fired-users', async (req, res) => {
+            const result = await usersCollection.find().toArray()
+            res.send(result)
+        })
+
+        app.get('/users', async (req, res) => {
+            const filter = { role: 'Employee' }
+            const result = await usersCollection.find(filter).toArray()
+            res.send(result)
         })
 
         //For Employee
@@ -163,17 +200,9 @@ async function run() {
 
         app.patch('/verify/:id', async (req, res) => {
             const id = req.params.id
-            const item = req.body
             const filter = { _id: new ObjectId(id) }
             const updatedDoc = {
                 $set: {
-                    name: item.name,
-                    role: item.role,
-                    email: item.email,
-                    salary: item.salary,
-                    image_url: item.image_url,
-                    designation: item.designation,
-                    bank_account_no: item.bank_account_no,
                     isVerified: true,
                 }
             }
@@ -183,31 +212,25 @@ async function run() {
 
         app.get('/work-sheets', async (req, res) => {
             const { employeeName, month } = req.query;
-            console.log(employeeName, month);
-        
+            // console.log(employeeName, month);
+
             let query = {};
-        
+
             if (employeeName) {
                 const user = await usersCollection.findOne({ name: employeeName });
                 if (user) {
                     query.user_email = user.email;
                 }
             }
-            
+
             if (month) {
                 query.date = { $regex: `^${parseInt(month)}/` };
             }
-            
-            console.log(query);
-            
-            try {
-                const result = await workSheetCollection.find(query).toArray();
-                res.send(result);
-            } catch (error) {
-                res.status(500).send({ error: 'An error occurred while fetching the work records' });
-            }
+
+            const result = await workSheetCollection.find(query).toArray();
+            res.send(result);
         });
-        
+
 
         //payment 
         app.post('/create-payment-intent', async (req, res) => {
